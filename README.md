@@ -39,7 +39,10 @@ Configure SSH Server in Jenkins:
 5. Click **"Test Configuration"** to verify connection
 6. Click **"Save"**
 
-Now use the `Jenkins.remote` file for deployment pipeline.
+Now use the `Jenkins.remote` file for deployment pipeline. Modify ssh config name:
+```sh
+configName: 'ssh-server-config-name'
+```
 
 ### Run the Pipeline
 
