@@ -5,18 +5,20 @@
 set -e
 
 echo "============================================"
-echo "Jenkins Backup Script (Docker Compose)"
+echo "Jenkins Backup Script (Docker Compose)      "
 echo "============================================"
 
 # === CONFIGURATION ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKUP_DIR="${SCRIPT_DIR}/backup"
 COMPOSE_DIR="${COMPOSE_DIR:-.}"
+TEMP_BACKUP_DIR="/tmp/jenkins-backup-temp"
 
 # === SCRIPT START ===
-echo ">> Creating $BACKUP_DIR"
+echo ">> Creating backup directories"
 mkdir -p "$BACKUP_DIR"
-ls -al "$BACKUP_DIR"
+rm -rf "$TEMP_BACKUP_DIR"
+mkdir -p "$TEMP_BACKUP_DIR"
 
 if [ -n "$1" ]; then
     BACKUP_NAME="$1.tar.gz"
@@ -30,52 +32,72 @@ get_jenkins_volume() {
 }
 
 # Get volume name
-echo ">> Get volume name and path..."
+echo ">> Getting Jenkins volume information..."
 VOLUME_NAME=$(get_jenkins_volume)
-VOLUME_PATH=$(docker volume inspect $VOLUME_NAME --format '{{ .Mountpoint }}' 2>/dev/null)
-echo "\tname: $VOLUME_NAME"
-echo "\tpath: $VOLUME_PATH"
 
-if [ -z "$VOLUME_PATH" ]; then
+if [ -z "$VOLUME_NAME" ]; then
     echo "ERROR: jenkins_home volume not found."
     echo "Make sure Jenkins has been started at least once with docker compose."
     exit 1
 fi
+
+echo "\tVolume name: $VOLUME_NAME"
 
 # Stop Jenkins for consistent backup
 echo ">> Stopping Jenkins..."
 cd "$COMPOSE_DIR"
 docker compose stop
 
-echo ">> cd $VOLUME_PATH"
-sudo cd "$VOLUME_PATH"
-ls -al "$VOLUME_PATH"
+echo ">> Creating backup using busybox container..."
 
-# Build exclude list
-EXCLUDES=(
-    "--exclude=workspace"
-    "--exclude=caches"
-    "--exclude=.cache"
-    "--exclude=war"
-    "--exclude=logs"
-    "--exclude=plugins"
-    "--exclude=builds"
-)
+# Create a temporary tar file inside busybox container
+TEMP_TAR="/tmp/jenkins-backup.tar.gz"
 
-echo ">> Creating backup..."
+# Run busybox container with jenkins volume mounted and create backup
+docker run --rm \
+    -v "${VOLUME_NAME}:/jenkins_data:ro" \
+    -v "${TEMP_BACKUP_DIR}:/backup_output" \
+    busybox \
+    sh -c "
+        cd /jenkins_data && \
+        echo 'Creating backup archive...' && \
+        tar -czf /backup_output/backup.tar.gz \
+            --exclude='workspace/*' \
+            --exclude='caches/*' \
+            --exclude='.cache/*' \
+            --exclude='war/*' \
+            --exclude='logs/*' \
+            --exclude='plugins/*' \
+            --exclude='builds/*' \
+            config.xml \
+            credentials*.xml \
+            secrets/ \
+            jobs/ \
+            users/ \
+            nodes/ \
+            *.xml \
+            userContent/ \
+            .ssh/ 2>/dev/null || true
+    "
 
-# Create backup
-sudo tar -czvf "$BACKUP_PATH" \
-    "${EXCLUDES[@]}" \
-    config.xml \
-    credentials*.xml \
-    secrets/ \
-    jobs/ \
-    users/ \
-    nodes/ \
-    *.xml \
-    userContent/ \
-    .ssh/
+echo ">> Backup created in busybox container"
+
+# Copy the backup from temporary location to final destination
+echo ">> Copying backup to final location..."
+cp "${TEMP_BACKUP_DIR}/backup.tar.gz" "$BACKUP_PATH"
+
+# Verify backup was created
+if [ -f "$BACKUP_PATH" ]; then
+    echo ">> Backup verification successful"
+    echo "\tSize: $(du -h "$BACKUP_PATH" | cut -f1)"
+else
+    echo "ERROR: Backup file was not created!"
+    exit 1
+fi
+
+# Cleanup temporary directory
+echo ">> Cleaning up temporary files..."
+rm -rf "$TEMP_BACKUP_DIR"
 
 # Restart Jenkins
 echo ">> Restarting Jenkins..."
@@ -87,7 +109,7 @@ echo "============================================"
 echo "Backup complete!"
 echo "============================================"
 echo "File: $BACKUP_PATH"
-echo "Size: $(du -h $BACKUP_PATH | cut -f1)"
+echo "Size: $(du -h "$BACKUP_PATH" | cut -f1)"
 echo ""
 echo "Next steps:"
 echo "1. Transfer to new server:"
