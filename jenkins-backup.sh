@@ -29,6 +29,7 @@ get_jenkins_volume() {
 
 # Get volume path
 VOLUME_NAME=$(get_jenkins_volume)
+VOLUME_PATH=$(docker volume inspect $VOLUME_NAME --format '{{ .Mountpoint }}' 2>/dev/null)
 
 if [ -z "$VOLUME_PATH" ]; then
     echo "ERROR: jenkins_home volume not found."
