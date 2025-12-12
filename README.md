@@ -1,3 +1,4 @@
+
 # Jenkins Test Example
 Learning Jenkins. Simple example with docker deployment from Git repo using a pipeline.
 
@@ -59,6 +60,9 @@ configName: 'ssh-server-config-name'
 ### Run the Pipeline
 
 Click **"Build Now"**. Watch the build progress in the left sidebar and click on the build number to see details.
+
+## Migration
+Read the [`migration`](./Migration.md) file. 
 
 ## LICENSE
 Unlicense.
