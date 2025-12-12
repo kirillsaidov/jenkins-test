@@ -14,6 +14,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKUP_DIR="${SCRIPT_DIR}/backup"
 COMPOSE_DIR="${COMPOSE_DIR:-.}"
 TEMP_BACKUP_DIR="/tmp/jenkins-backup-temp"
+CONTAINER_NAME="jenkins"
+
+get_jenkins_volume() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+}
 
 # === SCRIPT START ===
 echo ">> Creating backup directories"
@@ -28,9 +33,12 @@ else
 fi
 BACKUP_PATH="${BACKUP_DIR}/${BACKUP_NAME}"
 
-get_jenkins_volume() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
-}
+# Check if container exists
+if ! docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    echo "ERROR: container $CONTAINER_NAME does not exist."
+    echo "Make sure Jenkins has been started at least once with docker compose."
+	exit 1
+fi
 
 # Get volume name
 echo ">> Getting Jenkins volume information..."

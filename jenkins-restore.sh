@@ -4,18 +4,22 @@
 
 set -e
 
-# === CONFIGURATION ===
-BACKUP_FILE="${1:-}"
-COMPOSE_DIR="${COMPOSE_DIR:-.}"
-TEMP_RESTORE_DIR="/tmp/jenkins-restore-temp"
-
-# === SCRIPT START ===
 echo "============================================"
 echo "Jenkins Restore Script (Docker Compose)     "
 echo "============================================"
 echo ""
 
-# Check for backup file argument
+# === CONFIGURATION ===
+BACKUP_FILE="${1:-}"
+COMPOSE_DIR="${COMPOSE_DIR:-.}"
+TEMP_RESTORE_DIR="/tmp/jenkins-restore-temp"
+CONTAINER_NAME="jenkins"
+
+get_jenkins_volume() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+}
+
+# === SCRIPT START ===
 if [ -z "$BACKUP_FILE" ]; then
     echo "Usage: $0 <backup-file.tar.gz>"
     echo ""
@@ -29,27 +33,21 @@ if [ ! -f "$BACKUP_FILE" ]; then
     exit 1
 fi
 
-echo "Backup file: $BACKUP_FILE"
-echo "Compose dir: $COMPOSE_DIR"
-echo ""
+echo ">> Backup file: $BACKUP_FILE"
 
-# Check for docker-compose file
-cd "$COMPOSE_DIR"
-if [ ! -f "docker-compose.yaml" ] && [ ! -f "docker-compose.yml" ]; then
-    echo "ERROR: docker-compose.yaml not found in: $COMPOSE_DIR"
-    echo "Set COMPOSE_DIR environment variable or run from docker-compose directory."
-    exit 1
+# Check if container exists
+if ! docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+    echo "ERROR: container $CONTAINER_NAME does not exist."
+    echo "Make sure Jenkins has been started at least once with docker compose."
+	exit 1
 fi
 
-# Step 1: Stop Jenkins if running
+# Stop Jenkins if running
 echo ">> Stopping Jenkins..."
 docker compose stop
 
-# Step 2: Get volume name (not path)
+# Get volume name (not path)
 echo ">> Getting Jenkins volume name..."
-get_jenkins_volume() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
-}
 VOLUME_NAME=$(get_jenkins_volume)
 
 if [ -z "$VOLUME_NAME" ]; then
@@ -57,9 +55,10 @@ if [ -z "$VOLUME_NAME" ]; then
     echo "Make sure Jenkins has been started at least once with docker compose."
     exit 1
 fi
+
 echo "Volume name: $VOLUME_NAME"
 
-# Step 3: Extract backup to temporary directory
+# Extract backup to temporary directory
 echo ">> Preparing backup for restore..."
 echo "   Creating temporary directory..."
 rm -rf "$TEMP_RESTORE_DIR"
@@ -68,11 +67,8 @@ mkdir -p "$TEMP_RESTORE_DIR"
 echo "   Extracting backup to temporary location..."
 tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
 
-# Step 4: Restore using busybox container
-echo ">> Restoring files using busybox container..."
-
 # Clear existing configuration files from the volume
-echo "   Clearing old configurations from volume..."
+echo ">> Clearing old configurations from volume..."
 docker run --rm \
     -v "${VOLUME_NAME}:/jenkins_data" \
     busybox \
@@ -89,7 +85,7 @@ docker run --rm \
     "
 
 # Copy restored files from temp directory to volume
-echo "   Copying restored files to Jenkins volume..."
+echo ">> Copying restored files to Jenkins volume..."
 docker run --rm \
     -v "${TEMP_RESTORE_DIR}:/backup_source:ro" \
     -v "${VOLUME_NAME}:/jenkins_data" \
@@ -101,12 +97,12 @@ docker run --rm \
         chown -R 1000:1000 /jenkins_data
     "
 
-# Step 5: Cleanup and start Jenkins
-echo ">> Cleaning up and starting Jenkins..."
-echo "   Removing temporary files..."
+# Cleanup
+echo ">> Cleanup and removing temporary files..."
 sudo rm -rf "$TEMP_RESTORE_DIR"
 
-echo "   Starting Jenkins..."
+# Start Jenkins
+echo ">> Starting Jenkins..."
 docker compose start
 
 echo ""
