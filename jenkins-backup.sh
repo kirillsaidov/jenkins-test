@@ -4,13 +4,19 @@
 
 set -e
 
+echo "============================================"
+echo "Jenkins Backup Script (Docker Compose)"
+echo "============================================"
+
 # === CONFIGURATION ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKUP_DIR="${SCRIPT_DIR}/backup"
 COMPOSE_DIR="${COMPOSE_DIR:-.}"
 
 # === SCRIPT START ===
+echo ">> Creating $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
+ls -al "$BACKUP_DIR"
 
 if [ -n "$1" ]; then
     BACKUP_NAME="$1.tar.gz"
@@ -19,17 +25,16 @@ else
 fi
 BACKUP_PATH="${BACKUP_DIR}/${BACKUP_NAME}"
 
-echo "============================================"
-echo "Jenkins Backup Script (Docker Compose)"
-echo "============================================"
-
 get_jenkins_volume() {
   docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
 }
 
-# Get volume path
+# Get volume name
+echo ">> Get volume name and path..."
 VOLUME_NAME=$(get_jenkins_volume)
 VOLUME_PATH=$(docker volume inspect $VOLUME_NAME --format '{{ .Mountpoint }}' 2>/dev/null)
+echo "\tname: $VOLUME_NAME"
+echo "\tpath: $VOLUME_PATH"
 
 if [ -z "$VOLUME_PATH" ]; then
     echo "ERROR: jenkins_home volume not found."
@@ -37,16 +42,14 @@ if [ -z "$VOLUME_PATH" ]; then
     exit 1
 fi
 
-echo "Volume path: $VOLUME_PATH"
-echo "Backup destination: $BACKUP_PATH"
-echo ""
-
 # Stop Jenkins for consistent backup
-echo "Stopping Jenkins..."
+echo ">> Stopping Jenkins..."
 cd "$COMPOSE_DIR"
 docker compose stop
 
-cd "$VOLUME_PATH"
+echo ">> cd $VOLUME_PATH"
+sudo cd "$VOLUME_PATH"
+ls -al "$VOLUME_PATH"
 
 # Build exclude list
 EXCLUDES=(
@@ -59,7 +62,7 @@ EXCLUDES=(
     "--exclude=builds"
 )
 
-echo "Creating backup..."
+echo ">> Creating backup..."
 
 # Create backup
 sudo tar -czvf "$BACKUP_PATH" \
@@ -75,7 +78,7 @@ sudo tar -czvf "$BACKUP_PATH" \
     .ssh/
 
 # Restart Jenkins
-echo "Restarting Jenkins..."
+echo ">> Restarting Jenkins..."
 cd "$COMPOSE_DIR"
 docker compose start
 
