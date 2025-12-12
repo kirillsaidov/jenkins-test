@@ -7,6 +7,7 @@ set -e
 echo "============================================"
 echo "Jenkins Backup Script (Docker Compose)      "
 echo "============================================"
+echo ""
 
 # === CONFIGURATION ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -41,7 +42,7 @@ if [ -z "$VOLUME_NAME" ]; then
     exit 1
 fi
 
-echo "\tVolume name: $VOLUME_NAME"
+echo "Volume name: $VOLUME_NAME"
 
 # Stop Jenkins for consistent backup
 echo ">> Stopping Jenkins..."
@@ -89,7 +90,7 @@ cp "${TEMP_BACKUP_DIR}/backup.tar.gz" "$BACKUP_PATH"
 # Verify backup was created
 if [ -f "$BACKUP_PATH" ]; then
     echo ">> Backup verification successful"
-    echo "\tSize: $(du -h "$BACKUP_PATH" | cut -f1)"
+    echo "Size: $(du -h "$BACKUP_PATH" | cut -f1)"
 else
     echo "ERROR: Backup file was not created!"
     exit 1
