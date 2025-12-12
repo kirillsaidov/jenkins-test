@@ -6,6 +6,18 @@ Learning Jenkins. Simple example with docker deployment from Git repo using a pi
 docker compose up -d
 ```
 
+## Configure plugins
+You can configure plugins for automatic installation in [`plugins.txt`](./plugins.txt) file.
+- Edit `plugins.txt` to list plugin IDs and versions (e.g., git:5.2.2 or just git for the latest version).
+- Plugins are installed during Docker image build
+
+Example:
+```bash
+git:5.8.0
+github-api:1.330-492.v3941a_032db_2a_
+blueocean-core-js:1.27.23
+```
+
 ## Deploy example
 This example will use [`dummy-website`](https://github.com/kirillsaidov/dummy-website) for deployment. 
 
