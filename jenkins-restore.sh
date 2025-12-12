@@ -7,10 +7,11 @@ set -e
 # === CONFIGURATION ===
 BACKUP_FILE="${1:-}"
 COMPOSE_DIR="${COMPOSE_DIR:-.}"
+TEMP_RESTORE_DIR="/tmp/jenkins-restore-temp"
 
 # === SCRIPT START ===
 echo "============================================"
-echo "Jenkins Restore Script (Docker Compose)"
+echo "Jenkins Restore Script (Docker Compose) - Busybox Version"
 echo "============================================"
 
 # Check for backup file argument
@@ -40,11 +41,11 @@ if [ ! -f "docker-compose.yaml" ] && [ ! -f "docker-compose.yml" ]; then
 fi
 
 # Step 1: Stop Jenkins if running
-echo "[1/5] Stopping Jenkins..."
-docker compose down 2>/dev/null || true
+echo "[1/6] Stopping Jenkins..."
+docker compose down
 
 # Step 2: Ensure volume exists
-echo "[2/5] Ensuring Jenkins volume exists..."
+echo "[2/6] Ensuring Jenkins volume exists..."
 if ! docker volume inspect jenkins_home >/dev/null 2>&1; then
     echo "      Volume doesn't exist. Creating..."
     docker compose up -d
@@ -53,36 +54,65 @@ if ! docker volume inspect jenkins_home >/dev/null 2>&1; then
     docker compose down
 fi
 
-# Step 3: Get volume path
-echo "[3/5] Locating Jenkins volume..."
-VOLUME_PATH=$(docker volume inspect jenkins_home --format '{{ .Mountpoint }}')
+# Step 3: Get volume name (not path)
+echo "[3/6] Getting Jenkins volume name..."
+VOLUME_NAME="jenkins_home"
 
-if [ -z "$VOLUME_PATH" ]; then
-    echo "ERROR: Could not find jenkins_home volume"
+# Verify volume exists
+if ! docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
+    echo "ERROR: jenkins_home volume does not exist"
     exit 1
 fi
-echo "      Volume path: $VOLUME_PATH"
+echo "      Volume name: $VOLUME_NAME"
 
-# Step 4: Restore backup
-echo "[4/5] Restoring backup..."
-echo "      Clearing old configurations..."
-sudo rm -rf "${VOLUME_PATH}/jobs/"
-sudo rm -rf "${VOLUME_PATH}/users/"
-sudo rm -rf "${VOLUME_PATH}/nodes/"
-sudo rm -rf "${VOLUME_PATH}/secrets/"
-sudo rm -rf "${VOLUME_PATH}/userContent/"
-sudo rm -rf "${VOLUME_PATH}/.ssh/"
-sudo rm -f "${VOLUME_PATH}/config.xml"
-sudo rm -f "${VOLUME_PATH}"/credentials*.xml
+# Step 4: Extract backup to temporary directory
+echo "[4/6] Preparing backup for restore..."
+echo "      Creating temporary directory..."
+rm -rf "$TEMP_RESTORE_DIR"
+mkdir -p "$TEMP_RESTORE_DIR"
 
-echo "      Extracting backup..."
-sudo tar -xzvf "$BACKUP_FILE" -C "$VOLUME_PATH"
+echo "      Extracting backup to temporary location..."
+tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
 
-echo "      Setting permissions..."
-sudo chown -R 1000:1000 "$VOLUME_PATH"
+# Step 5: Restore using busybox container
+echo "[5/6] Restoring files using busybox container..."
 
-# Step 5: Start Jenkins
-echo "[5/5] Starting Jenkins..."
+# Clear existing configuration files from the volume
+echo "      Clearing old configurations from volume..."
+docker run --rm \
+    -v "${VOLUME_NAME}:/jenkins_data" \
+    busybox \
+    sh -c "
+        echo 'Removing old configuration files...' && \
+        rm -rf /jenkins_data/jobs/ \
+               /jenkins_data/users/ \
+               /jenkins_data/nodes/ \
+               /jenkins_data/secrets/ \
+               /jenkins_data/userContent/ \
+               /jenkins_data/.ssh/ \
+               /jenkins_data/config.xml \
+               /jenkins_data/credentials*.xml 2>/dev/null || true
+    "
+
+# Copy restored files from temp directory to volume
+echo "      Copying restored files to Jenkins volume..."
+docker run --rm \
+    -v "${TEMP_RESTORE_DIR}:/backup_source:ro" \
+    -v "${VOLUME_NAME}:/jenkins_data" \
+    busybox \
+    sh -c "
+        echo 'Copying backup files to Jenkins volume...' && \
+        cp -a /backup_source/* /jenkins_data/ 2>/dev/null && \
+        echo 'Setting correct permissions...' && \
+        chown -R 1000:1000 /jenkins_data
+    "
+
+# Step 6: Cleanup and start Jenkins
+echo "[6/6] Cleaning up and starting Jenkins..."
+echo "      Removing temporary files..."
+sudo rm -rf "$TEMP_RESTORE_DIR"
+
+echo "      Starting Jenkins..."
 docker compose up -d
 
 echo ""
@@ -98,6 +128,8 @@ echo "  [ ] Verify jobs appear"
 echo "  [ ] Check credentials (Manage Jenkins → Credentials)"
 echo "  [ ] Test SSH connections"
 echo "  [ ] Update Jenkins URL if needed"
+echo ""
+echo "Note: Plugins will need to be installed separately as they are not included in the backup."
 
 
 
