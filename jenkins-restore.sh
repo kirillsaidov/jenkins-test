@@ -42,12 +42,12 @@ fi
 
 # Step 1: Stop Jenkins if running
 echo "[1/6] Stopping Jenkins..."
-docker compose down
+docker compose stop
 
 # Step 2: Get volume name (not path)
 echo "[2/6] Getting Jenkins volume name..."
 get_jenkins_volume() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins >/dev/null 2>&1
 }
 VOLUME_NAME=$(get_jenkins_volume)
 echo "      Volume name: $VOLUME_NAME"
@@ -59,7 +59,7 @@ if ! docker volume inspect jenkins_home >/dev/null 2>&1; then
     docker compose up -d
     echo "      Waiting for initialization..."
     sleep 30
-    docker compose down
+    docker compose stop
 
 	# find volumen name again
 	VOLUME_NAME=$(get_jenkins_volume)
@@ -120,7 +120,7 @@ echo "      Removing temporary files..."
 sudo rm -rf "$TEMP_RESTORE_DIR"
 
 echo "      Starting Jenkins..."
-docker compose up -d
+docker compose start
 
 echo ""
 echo "============================================"
