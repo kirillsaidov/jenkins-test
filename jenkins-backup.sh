@@ -44,7 +44,7 @@ echo ""
 # Stop Jenkins for consistent backup
 echo "Stopping Jenkins..."
 cd "$COMPOSE_DIR"
-docker compose down 2>/dev/null || true
+docker compose stop
 
 cd "$VOLUME_PATH"
 
@@ -72,12 +72,12 @@ sudo tar -czvf "$BACKUP_PATH" \
     nodes/ \
     *.xml \
     userContent/ \
-    .ssh/ 2>/dev/null || true
+    .ssh/
 
 # Restart Jenkins
 echo "Restarting Jenkins..."
 cd "$COMPOSE_DIR"
-docker compose up -d
+docker compose start
 
 echo ""
 echo "============================================"
