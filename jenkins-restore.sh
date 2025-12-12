@@ -47,33 +47,19 @@ docker compose stop
 # Step 2: Get volume name (not path)
 echo "[2/6] Getting Jenkins volume name..."
 get_jenkins_volume() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins >/dev/null 2>&1
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
 }
 VOLUME_NAME=$(get_jenkins_volume)
-echo "      Volume name: $VOLUME_NAME"
 
-# Step 3: Ensure volume exists
-echo "[3/6] Ensuring Jenkins volume exists..."
-if ! docker volume inspect jenkins_home >/dev/null 2>&1; then
-    echo "      Volume doesn't exist. Creating..."
-    docker compose up -d
-    echo "      Waiting for initialization..."
-    sleep 30
-    docker compose stop
-
-	# find volumen name again
-	VOLUME_NAME=$(get_jenkins_volume)
-	echo "      Volume name: $VOLUME_NAME"
-fi
-
-# Verify volume exists
-if ! docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
-    echo "ERROR: jenkins_home volume does not exist"
+if [ -z "$VOLUME_NAME" ]; then
+    echo "ERROR: jenkins_home volume not found."
+    echo "Make sure Jenkins has been started at least once with docker compose."
     exit 1
 fi
+echo "      Volume name: $VOLUME_NAME"
 
-# Step 4: Extract backup to temporary directory
-echo "[4/6] Preparing backup for restore..."
+# Step 3: Extract backup to temporary directory
+echo "[3/6] Preparing backup for restore..."
 echo "      Creating temporary directory..."
 rm -rf "$TEMP_RESTORE_DIR"
 mkdir -p "$TEMP_RESTORE_DIR"
@@ -81,8 +67,8 @@ mkdir -p "$TEMP_RESTORE_DIR"
 echo "      Extracting backup to temporary location..."
 tar -xzvf "$BACKUP_FILE" -C "$TEMP_RESTORE_DIR"
 
-# Step 5: Restore using busybox container
-echo "[5/6] Restoring files using busybox container..."
+# Step 4: Restore using busybox container
+echo "[4/6] Restoring files using busybox container..."
 
 # Clear existing configuration files from the volume
 echo "      Clearing old configurations from volume..."
@@ -114,13 +100,15 @@ docker run --rm \
         chown -R 1000:1000 /jenkins_data
     "
 
-# Step 6: Cleanup and start Jenkins
-echo "[6/6] Cleaning up and starting Jenkins..."
+# Step 5: Cleanup and start Jenkins
+echo "[5/6] Cleaning up and starting Jenkins..."
 echo "      Removing temporary files..."
 sudo rm -rf "$TEMP_RESTORE_DIR"
 
 echo "      Starting Jenkins..."
 docker compose start
+
+echo "[6/6] Done."
 
 echo ""
 echo "============================================"
