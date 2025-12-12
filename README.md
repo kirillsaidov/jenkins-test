@@ -2,6 +2,15 @@
 # Jenkins Test Example
 Learning Jenkins. Simple example with docker deployment from Git repo using a pipeline.
 
+## Contents
+1. [Run Jenkins](#run-jenkins)
+2. [Configure plugins](#configure-plugins)
+3. [Deploy example](#deploy-example)
+    * [Create a Pipeline Job in Jenkins](#create-a-pipeline-job-in-Jenkins)
+	* [Configure the Pipeline](#configure-the-pipeline)
+	* [Remote deployment](#remote-deployment)
+4. [Migration](#migration)
+
 ## Run Jenkins
 ```sh
 docker compose up -d
@@ -57,9 +66,7 @@ Now use the `Jenkins` file for deployment pipeline. Modify ssh config name:
 configName: 'ssh-server-config-name'
 ```
 
-### Run the Pipeline
-
-Click **"Build Now"**. Watch the build progress in the left sidebar and click on the build number to see details.
+To run the pipeline click **"Build Now"**. Watch the build progress in the left sidebar and click on the build number to see details.
 
 ## Migration
 Read the [`migration`](./Migration.md) file. 

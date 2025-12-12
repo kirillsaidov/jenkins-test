@@ -14,7 +14,7 @@ chmod +x jenkins-backup.sh
 # Custom name (creates ./backup/my-backup.tar.gz)
 ./jenkins-backup.sh my-backup
 
-# Default name (creates ./backup/jenkins-backup-.tar.gz)
+# Default name (creates ./backup/jenkins-backup-<timestamp>.tar.gz)
 ./jenkins-backup.sh
 ```
 
