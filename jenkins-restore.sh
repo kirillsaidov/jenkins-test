@@ -56,7 +56,11 @@ fi
 
 # Step 3: Get volume name (not path)
 echo "[3/6] Getting Jenkins volume name..."
-VOLUME_NAME="jenkins_home"
+get_jenkins_volume() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+}
+VOLUME_NAME=$(get_jenkins_volume)
+echo "\tVolume name: $VOLUME_NAME"
 
 # Verify volume exists
 if ! docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
