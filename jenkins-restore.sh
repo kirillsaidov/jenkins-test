@@ -11,7 +11,7 @@ TEMP_RESTORE_DIR="/tmp/jenkins-restore-temp"
 
 # === SCRIPT START ===
 echo "============================================"
-echo "Jenkins Restore Script (Docker Compose) - Busybox Version"
+echo "Jenkins Restore Script (Docker Compose)     "
 echo "============================================"
 
 # Check for backup file argument
@@ -44,30 +44,33 @@ fi
 echo "[1/6] Stopping Jenkins..."
 docker compose down
 
-# Step 2: Ensure volume exists
-echo "[2/6] Ensuring Jenkins volume exists..."
+# Step 2: Get volume name (not path)
+echo "[2/6] Getting Jenkins volume name..."
+get_jenkins_volume() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+}
+VOLUME_NAME=$(get_jenkins_volume)
+echo "      Volume name: $VOLUME_NAME"
+
+# Step 3: Ensure volume exists
+echo "[3/6] Ensuring Jenkins volume exists..."
 if ! docker volume inspect jenkins_home >/dev/null 2>&1; then
     echo "      Volume doesn't exist. Creating..."
     docker compose up -d
     echo "      Waiting for initialization..."
     sleep 30
     docker compose down
-fi
 
-# Step 3: Get volume name (not path)
-echo "[3/6] Getting Jenkins volume name..."
-get_jenkins_volume() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
-}
-VOLUME_NAME=$(get_jenkins_volume)
-echo "\tVolume name: $VOLUME_NAME"
+	# find volumen name again
+	VOLUME_NAME=$(get_jenkins_volume)
+	echo "      Volume name: $VOLUME_NAME"
+fi
 
 # Verify volume exists
 if ! docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
     echo "ERROR: jenkins_home volume does not exist"
     exit 1
 fi
-echo "      Volume name: $VOLUME_NAME"
 
 # Step 4: Extract backup to temporary directory
 echo "[4/6] Preparing backup for restore..."
