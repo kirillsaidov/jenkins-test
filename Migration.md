@@ -4,9 +4,9 @@
 
 - Ensure `docker compose` is available on your server.
 - Scripts must be run from the directory containing `docker-compose.yaml`
- Backup (Source Server)
 
-## Backup
+## Migration
+### Backup
 
 ```bash
 chmod +x jenkins-backup.sh
@@ -23,7 +23,7 @@ This will:
 2. Create backup in `backup/` folder (alongside script)
 3. Restart Jenkins
 
-## Restore
+### Restore
 
 ```bash
 chmod +x jenkins-restore.sh
@@ -35,7 +35,7 @@ This will:
 2. Restore all configs, jobs, credentials
 3. Start Jenkins
 
-## What Gets Backed Up
+### What Gets Backed Up
 
 - Jobs
 - Credentials (SSH keys, passwords, tokens)
