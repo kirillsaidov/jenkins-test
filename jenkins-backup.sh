@@ -23,8 +23,12 @@ echo "============================================"
 echo "Jenkins Backup Script (Docker Compose)"
 echo "============================================"
 
+get_jenkins_volume() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/jenkins_home"}}{{.Name}}{{end}}{{end}}' jenkins
+}
+
 # Get volume path
-VOLUME_PATH=$(docker volume inspect jenkins_home --format '{{ .Mountpoint }}' 2>/dev/null)
+VOLUME_NAME=$(get_jenkins_volume)
 
 if [ -z "$VOLUME_PATH" ]; then
     echo "ERROR: jenkins_home volume not found."
